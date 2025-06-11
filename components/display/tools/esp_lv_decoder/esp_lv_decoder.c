@@ -152,6 +152,8 @@ static lv_res_t libpng_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const u
 
     return LV_RES_OK;
 #else
+  *w = 0;
+  *h = 0;
   ESP_LOGE(TAG, "PNG decoder is not enabled");
   return LV_RES_INV;
 #endif // CONFIG_ESP_LV_PNG_DECODER_ENABLED
@@ -177,6 +179,8 @@ static lv_res_t qoi_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const uint
     }
     return LV_RES_OK;
 #else
+  *w = 0;
+  *h = 0;
   ESP_LOGE(TAG, "QOI decoder is not enabled");
   return LV_RES_INV;
 #endif // ESP_LV_QOI_DECODER_ENABLED
@@ -266,6 +270,8 @@ static lv_res_t jpeg_decode(uint8_t **out, uint32_t *w, uint32_t *h, const uint8
 
     return LV_RES_OK;
 #else
+  *w = 0;
+  *h = 0;
   ESP_LOGE(TAG, "JPG decoder is not enabled");
   return LV_RES_INV;
 #endif // CONFIG_ESP_LV_JPG_DECODER_ENABLED
