@@ -16,10 +16,16 @@
 
 #include "lvgl.h"
 
+#ifdef CONFIG_ESP_LV_PNG_DECODER_ENABLED
 #include "png.h"
+#endif
+#ifdef CONFIG_ESP_LV_JPG_DECODER_ENABLED
 #include "esp_jpeg_dec.h"
+#endif
+#ifdef ESP_LV_QOI_DECODER_ENABLED
 #define QOI_IMPLEMENTATION
 #include "qoi.h"
+#endif
 
 /*********************
  *      DEFINES
@@ -115,6 +121,7 @@ esp_err_t esp_lv_decoder_deinit(esp_lv_decoder_handle_t handle)
 
 static lv_res_t libpng_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const uint8_t *in, size_t insize)
 {
+#ifdef CONFIG_ESP_LV_PNG_DECODER_ENABLED
     if (!in || !out || !w || !h) {
         return LV_RES_INV;
     }
@@ -144,10 +151,15 @@ static lv_res_t libpng_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const u
     }
 
     return LV_RES_OK;
+#else
+  ESP_LOGE(TAG, "PNG decoder is not enabled");
+  return LV_RES_INV;
+#endif // CONFIG_ESP_LV_PNG_DECODER_ENABLED
 }
 
 static lv_res_t qoi_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const uint8_t *in, size_t insize)
 {
+#ifdef ESP_LV_QOI_DECODER_ENABLED
     if (!in || !out || !w || !h) {
         return LV_RES_INV;
     }
@@ -164,10 +176,15 @@ static lv_res_t qoi_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const uint
         return LV_RES_INV;
     }
     return LV_RES_OK;
+#else
+  ESP_LOGE(TAG, "QOI decoder is not enabled");
+  return LV_RES_INV;
+#endif // ESP_LV_QOI_DECODER_ENABLED
 }
 
 static lv_res_t jpeg_decode(uint8_t **out, uint32_t *w, uint32_t *h, const uint8_t *in, uint32_t insize)
 {
+#ifdef CONFIG_ESP_LV_JPG_DECODER_ENABLED
     jpeg_error_t ret;
     jpeg_dec_config_t config = {
 #if  LV_COLOR_DEPTH == 32
@@ -248,6 +265,10 @@ static lv_res_t jpeg_decode(uint8_t **out, uint32_t *w, uint32_t *h, const uint8
     jpeg_dec_close(jpeg_dec);
 
     return LV_RES_OK;
+#else
+  ESP_LOGE(TAG, "JPG decoder is not enabled");
+  return LV_RES_INV;
+#endif // CONFIG_ESP_LV_JPG_DECODER_ENABLED
 }
 
 static lv_fs_res_t load_image_file(const char *filename, uint8_t **buffer, size_t *size, bool read_head)
