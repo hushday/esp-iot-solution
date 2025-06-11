@@ -1,0 +1,26 @@
+# Kconfig file for ESP LVGL decoder
+
+menu "ESP LVGL decoder"
+
+    config ESP_LV_PNG_DECODER_ENABLED
+        bool "Enable ESP LV PNG decoder"
+        default y
+        help
+            Enable the ESP LV PNG decoder. This is required for displaying PNG images in the ESP LVGL library.
+            If you do not need to display PNG images, you can disable this option to save memory.
+
+    config ESP_LV_JPG_DECODER_ENABLED
+        bool "Enable ESP LV JPG decoder"
+        default y
+        help
+            Enable the ESP LV JPG decoder. This is required for displaying JPG images in the ESP LVGL library.
+            If you do not need to display JPG images, you can disable this option to save memory.
+    
+    config ESP_LV_QOI_DECODER_ENABLED
+        bool "Enable ESP LV QOI decoder"
+        default y
+        help
+            Enable the ESP LV QOI decoder. This is required for displaying QOI images in the ESP LVGL library.
+            If you do not need to display QOI images, you can disable this option to save memory.
+
+endmenu
