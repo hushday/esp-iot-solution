@@ -22,7 +22,7 @@
 #ifdef CONFIG_ESP_LV_JPG_DECODER_ENABLED
 #include "esp_jpeg_dec.h"
 #endif
-#ifdef ESP_LV_QOI_DECODER_ENABLED
+#ifdef CONFIG_ESP_LV_QOI_DECODER_ENABLED
 #define QOI_IMPLEMENTATION
 #include "qoi.h"
 #endif
@@ -161,7 +161,7 @@ static lv_res_t libpng_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const u
 
 static lv_res_t qoi_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const uint8_t *in, size_t insize)
 {
-#ifdef ESP_LV_QOI_DECODER_ENABLED
+#ifdef CONFIG_ESP_LV_QOI_DECODER_ENABLED
     if (!in || !out || !w || !h) {
         return LV_RES_INV;
     }
@@ -183,7 +183,7 @@ static lv_res_t qoi_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const uint
   *h = 0;
   ESP_LOGE(TAG, "QOI decoder is not enabled");
   return LV_RES_INV;
-#endif // ESP_LV_QOI_DECODER_ENABLED
+#endif // CONFIG_ESP_LV_QOI_DECODER_ENABLED
 }
 
 static lv_res_t jpeg_decode(uint8_t **out, uint32_t *w, uint32_t *h, const uint8_t *in, uint32_t insize)
