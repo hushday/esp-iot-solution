@@ -56,11 +56,11 @@ typedef struct {
 /**********************
  *  STATIC PROTOTYPES
  **********************/
-static lv_res_t decoder_info(struct _lv_img_decoder_t *decoder, const void *src, lv_img_header_t *header);
-static lv_res_t decoder_open(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *dsc);
-static lv_res_t decoder_read_line(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *dsc, lv_coord_t x, lv_coord_t y,
+static lv_result_t decoder_info(struct _lv_image_decoder_t *decoder, const void *src, lv_image_header_t *header);
+static lv_result_t decoder_open(lv_image_decoder_t *decoder, lv_image_decoder_dsc_t *dsc);
+static lv_result_t decoder_read_line(lv_image_decoder_t *decoder, lv_image_decoder_dsc_t *dsc, lv_coord_t x, lv_coord_t y,
                                   lv_coord_t len, uint8_t *buf);
-static void decoder_close(lv_img_decoder_t *dec, lv_img_decoder_dsc_t *dsc);
+static void decoder_close(lv_image_decoder_t *dec, lv_image_decoder_dsc_t *dsc);
 static void convert_color_depth(uint8_t *img, uint32_t px_cnt);
 static int is_png(const uint8_t *raw_data, size_t len);
 static int is_qoi(const uint8_t *raw_data, size_t len);
@@ -68,9 +68,9 @@ static int is_jpg(const uint8_t *raw_data, size_t len);
 static void decoder_cleanup(image_decoder_t *img_dec);
 static void decoder_free(image_decoder_t *img_dec);
 
-static lv_res_t libpng_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const uint8_t *in, size_t insize);
-static lv_res_t qoi_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const uint8_t *in, size_t insize);
-static lv_res_t jpeg_decode(uint8_t **out, uint32_t *w, uint32_t *h, const uint8_t *in, uint32_t insize);
+static lv_result_t libpng_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const uint8_t *in, size_t insize);
+static lv_result_t qoi_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const uint8_t *in, size_t insize);
+static lv_result_t jpeg_decode(uint8_t **out, uint32_t *w, uint32_t *h, const uint8_t *in, uint32_t insize);
 
 /**********************
  *  STATIC VARIABLES
@@ -92,11 +92,11 @@ esp_err_t esp_lv_decoder_init(esp_lv_decoder_handle_t *ret_handle)
 {
     ESP_RETURN_ON_FALSE(ret_handle, ESP_ERR_INVALID_ARG, TAG, "invalid argument");
 
-    lv_img_decoder_t *dec = lv_img_decoder_create();
-    lv_img_decoder_set_info_cb(dec, decoder_info);
-    lv_img_decoder_set_open_cb(dec, decoder_open);
-    lv_img_decoder_set_close_cb(dec, decoder_close);
-    lv_img_decoder_set_read_line_cb(dec, decoder_read_line);
+    lv_image_decoder_t *dec = lv_image_decoder_create();
+    lv_image_decoder_set_info_cb(dec, decoder_info);
+    lv_image_decoder_set_open_cb(dec, decoder_open);
+    lv_image_decoder_set_close_cb(dec, decoder_close);
+    lv_image_decoder_set_read_line_cb(dec, decoder_read_line);
 
     *ret_handle = dec;
     ESP_LOGD(TAG, "new img_dec decoder @%p", dec);
@@ -109,7 +109,7 @@ esp_err_t esp_lv_decoder_deinit(esp_lv_decoder_handle_t handle)
 {
     ESP_RETURN_ON_FALSE(handle, ESP_ERR_INVALID_ARG, TAG, "invalid decoder handle pointer");
     ESP_LOGD(TAG, "delete img_dec decoder @%p", handle);
-    lv_img_decoder_delete(handle);
+    lv_image_decoder_delete(handle);
 
     return ESP_OK;
 
@@ -119,11 +119,11 @@ esp_err_t esp_lv_decoder_deinit(esp_lv_decoder_handle_t handle)
  *   STATIC FUNCTIONS
  **********************/
 
-static lv_res_t libpng_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const uint8_t *in, size_t insize)
+static lv_result_t libpng_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const uint8_t *in, size_t insize)
 {
 #ifdef CONFIG_ESP_LV_PNG_DECODER_ENABLED
     if (!in || !out || !w || !h) {
-        return LV_RES_INV;
+        return LV_RESULT_INVALID;
     }
 
     png_image image;
@@ -131,7 +131,7 @@ static lv_res_t libpng_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const u
     image.version = PNG_IMAGE_VERSION;
 
     if (!png_image_begin_read_from_memory(&image, in, insize)) {
-        return LV_RES_INV;
+        return LV_RESULT_INVALID;
     }
 
     image.format = PNG_FORMAT_RGBA;
@@ -141,29 +141,29 @@ static lv_res_t libpng_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const u
     *out = malloc(PNG_IMAGE_SIZE(image));
     if (*out == NULL) {
         png_image_free(&image);
-        return LV_RES_INV;
+        return LV_RESULT_INVALID;
     }
 
     if (!png_image_finish_read(&image, NULL, *out, 0, NULL)) {
         free(*out);
         png_image_free(&image);
-        return LV_RES_INV;
+        return LV_RESULT_INVALID;
     }
 
-    return LV_RES_OK;
+    return LV_RESULT_OK;
 #else
   *w = 0;
   *h = 0;
   ESP_LOGE(TAG, "PNG decoder is not enabled");
-  return LV_RES_INV;
+  return LV_RESULT_INVALID;
 #endif // CONFIG_ESP_LV_PNG_DECODER_ENABLED
 }
 
-static lv_res_t qoi_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const uint8_t *in, size_t insize)
+static lv_result_t qoi_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const uint8_t *in, size_t insize)
 {
 #ifdef CONFIG_ESP_LV_QOI_DECODER_ENABLED
     if (!in || !out || !w || !h) {
-        return LV_RES_INV;
+        return LV_RESULT_INVALID;
     }
 
     qoi_desc image;
@@ -175,18 +175,18 @@ static lv_res_t qoi_decode32(uint8_t **out, uint32_t *w, uint32_t *h, const uint
     *h = image.height;
     *out = pixels;
     if (*out == NULL) {
-        return LV_RES_INV;
+        return LV_RESULT_INVALID;
     }
-    return LV_RES_OK;
+    return LV_RESULT_OK;
 #else
   *w = 0;
   *h = 0;
   ESP_LOGE(TAG, "QOI decoder is not enabled");
-  return LV_RES_INV;
+  return LV_RESULT_INVALID;
 #endif // CONFIG_ESP_LV_QOI_DECODER_ENABLED
 }
 
-static lv_res_t jpeg_decode(uint8_t **out, uint32_t *w, uint32_t *h, const uint8_t *in, uint32_t insize)
+static lv_result_t jpeg_decode(uint8_t **out, uint32_t *w, uint32_t *h, const uint8_t *in, uint32_t insize)
 {
 #ifdef CONFIG_ESP_LV_JPG_DECODER_ENABLED
     jpeg_error_t ret;
@@ -209,7 +209,7 @@ static lv_res_t jpeg_decode(uint8_t **out, uint32_t *w, uint32_t *h, const uint8
     jpeg_dec_open(&config, &jpeg_dec);
     if (!jpeg_dec) {
         ESP_LOGE(TAG, "Failed to open jpeg decoder");
-        return LV_RES_INV;
+        return LV_RESULT_INVALID;
     }
 
     jpeg_dec_io_t *jpeg_io = malloc(sizeof(jpeg_dec_io_t));
@@ -223,7 +223,7 @@ static lv_res_t jpeg_decode(uint8_t **out, uint32_t *w, uint32_t *h, const uint8
         }
         jpeg_dec_close(jpeg_dec);
         ESP_LOGE(TAG, "Failed to allocate memory for jpeg decoder");
-        return LV_RES_INV;
+        return LV_RESULT_INVALID;
     }
 
     jpeg_io->inbuf = (unsigned char *)in;
@@ -241,7 +241,7 @@ static lv_res_t jpeg_decode(uint8_t **out, uint32_t *w, uint32_t *h, const uint8
                 free(out_info);
                 jpeg_dec_close(jpeg_dec);
                 ESP_LOGE(TAG, "Failed to allocate memory for output buffer");
-                return LV_RES_INV;
+                return LV_RESULT_INVALID;
             }
 
             jpeg_io->outbuf = *out;
@@ -253,7 +253,7 @@ static lv_res_t jpeg_decode(uint8_t **out, uint32_t *w, uint32_t *h, const uint8
                 free(out_info);
                 jpeg_dec_close(jpeg_dec);
                 ESP_LOGE(TAG, "Failed to decode jpeg:[%d]", ret);
-                return LV_RES_INV;
+                return LV_RESULT_INVALID;
             }
         }
     } else {
@@ -261,19 +261,19 @@ static lv_res_t jpeg_decode(uint8_t **out, uint32_t *w, uint32_t *h, const uint8
         free(out_info);
         jpeg_dec_close(jpeg_dec);
         ESP_LOGE(TAG, "Failed to parse jpeg header");
-        return LV_RES_INV;
+        return LV_RESULT_INVALID;
     }
 
     free(jpeg_io);
     free(out_info);
     jpeg_dec_close(jpeg_dec);
 
-    return LV_RES_OK;
+    return LV_RESULT_OK;
 #else
   *w = 0;
   *h = 0;
   ESP_LOGE(TAG, "JPG decoder is not enabled");
-  return LV_RES_INV;
+  return LV_RESULT_INVALID;
 #endif // CONFIG_ESP_LV_JPG_DECODER_ENABLED
 }
 
@@ -324,17 +324,17 @@ static lv_fs_res_t load_image_file(const char *filename, uint8_t **buffer, size_
  * Get info about a PNG image
  * @param src can be file name or pointer to a C array
  * @param header store the info here
- * @return LV_RES_OK: no error; LV_RES_INV: can't get the info
+ * @return LV_RESULT_OK: no error; LV_RESULT_INVALID: can't get the info
  */
-static lv_res_t decoder_info(struct _lv_img_decoder_t *decoder, const void *src, lv_img_header_t *header)
+static lv_result_t decoder_info(struct _lv_image_decoder_t *decoder, const void *src, lv_image_header_t *header)
 {
     (void) decoder; /*Unused*/
-    lv_img_src_t src_type = lv_img_src_get_type(src);          /*Get the source type*/
+    lv_image_src_t src_type = lv_image_src_get_type(src);          /*Get the source type*/
 
-    lv_res_t lv_ret = LV_RES_OK;
+    lv_result_t lv_ret = LV_RESULT_OK;
 
-    if (src_type == LV_IMG_SRC_VARIABLE) {
-        const lv_img_dsc_t *img_dsc = src;
+    if (src_type == LV_IMAGE_SRC_VARIABLE) {
+        const lv_image_dsc_t *img_dsc = src;
         uint8_t *img_dsc_data = (uint8_t *)img_dsc->data;
         const uint32_t img_dsc_size = img_dsc->data_size;
 
@@ -342,9 +342,9 @@ static lv_res_t decoder_info(struct _lv_img_decoder_t *decoder, const void *src,
                 !strncmp((char *)img_dsc_data, "_SQOI__", strlen("_SQOI__")) ||
                 !strncmp((char *)img_dsc_data, "_SJPG__", strlen("_SJPG__"))) {
             if (!strncmp((char *)img_dsc_data, "_SJPG__", strlen("_SJPG__"))) {
-                header->cf = LV_IMG_CF_RAW;
+                header->cf = LV_IMAGE_CF_RAW;
             } else {
-                header->cf = LV_IMG_CF_RAW_ALPHA;
+                header->cf = LV_IMAGE_CF_RAW_ALPHA;
             }
             img_dsc_data += 14; //seek to res info ... refer spng format
 
@@ -363,7 +363,7 @@ static lv_res_t decoder_info(struct _lv_img_decoder_t *decoder, const void *src,
             if (img_dsc->header.cf) {
                 header->cf = img_dsc->header.cf;       /*Save the color format*/
             } else {
-                header->cf = LV_IMG_CF_TRUE_COLOR_ALPHA;
+                header->cf = LV_IMAGE_CF_TRUE_COLOR_ALPHA;
             }
 
             if (img_dsc->header.w) {
@@ -387,7 +387,7 @@ static lv_res_t decoder_info(struct _lv_img_decoder_t *decoder, const void *src,
             if (img_dsc->header.cf) {
                 header->cf = img_dsc->header.cf;       /*Save the color format*/
             } else {
-                header->cf = LV_IMG_CF_TRUE_COLOR_ALPHA;
+                header->cf = LV_IMAGE_CF_TRUE_COLOR_ALPHA;
             }
 
             if (img_dsc->header.w) {
@@ -410,13 +410,13 @@ static lv_res_t decoder_info(struct _lv_img_decoder_t *decoder, const void *src,
             header->w = width;
             header->h = height;
             header->always_zero = 0;
-            header->cf = LV_IMG_CF_RAW;
+            header->cf = LV_IMAGE_CF_RAW;
 
             return lv_ret;
         } else {
-            return LV_RES_INV;
+            return LV_RESULT_INVALID;
         }
-    } else if (src_type == LV_IMG_SRC_FILE) {
+    } else if (src_type == LV_IMAGE_SRC_FILE) {
         const char *fn = src;
         uint8_t *load_img_data = NULL;  /*Pointer to the loaded data. Same as the original file just loaded into the RAM*/
         size_t load_img_size;           /*Size of `load_img_data` in bytes*/
@@ -427,11 +427,11 @@ static lv_res_t decoder_info(struct _lv_img_decoder_t *decoder, const void *src,
                 if (load_img_data) {
                     free(load_img_data);
                 }
-                return LV_RES_INV;
+                return LV_RESULT_INVALID;
             }
 
             const uint32_t *size = ((uint32_t *)load_img_data) + 4;
-            header->cf = LV_IMG_CF_TRUE_COLOR_ALPHA;
+            header->cf = LV_IMAGE_CF_TRUE_COLOR_ALPHA;
             header->w = (lv_coord_t)((size[0] & 0xff000000) >> 24) + ((size[0] & 0x00ff0000) >> 8);
             header->h = (lv_coord_t)((size[1] & 0xff000000) >> 24) + ((size[1] & 0x00ff0000) >> 8);
             free(load_img_data);
@@ -442,11 +442,11 @@ static lv_res_t decoder_info(struct _lv_img_decoder_t *decoder, const void *src,
                 if (load_img_data) {
                     free(load_img_data);
                 }
-                return LV_RES_INV;
+                return LV_RESULT_INVALID;
             }
 
             const uint8_t *size = ((uint8_t *)load_img_data) + 4;
-            header->cf = LV_IMG_CF_TRUE_COLOR_ALPHA;
+            header->cf = LV_IMAGE_CF_TRUE_COLOR_ALPHA;
             header->w = (lv_coord_t)((size[0] << 24) + (size[1] << 16) + (size[2] << 8) + (size[3] << 0));
             header->h = (lv_coord_t)((size[4] << 24) + (size[5] << 16) + (size[6] << 8) + (size[7] << 0));
             free(load_img_data);
@@ -457,13 +457,13 @@ static lv_res_t decoder_info(struct _lv_img_decoder_t *decoder, const void *src,
                 if (load_img_data) {
                     free(load_img_data);
                 }
-                return LV_RES_INV;
+                return LV_RESULT_INVALID;
             }
 
             uint32_t width, height;
             lv_ret = jpeg_decode(NULL, &width, &height, load_img_data, load_img_size);
 
-            header->cf = LV_IMG_CF_TRUE_COLOR;
+            header->cf = LV_IMAGE_CF_TRUE_COLOR;
             header->w = width;
             header->h = height;
             free(load_img_data);
@@ -485,7 +485,7 @@ static lv_res_t decoder_info(struct _lv_img_decoder_t *decoder, const void *src,
             res = lv_fs_read(&file, buff, 8, &rn);
             if (res != LV_FS_RES_OK || rn != 8) {
                 lv_fs_close(&file);
-                return LV_RES_INV;
+                return LV_RESULT_INVALID;
             }
 
             if (!strcmp((char *)buff, "_SPNG__") ||
@@ -493,16 +493,16 @@ static lv_res_t decoder_info(struct _lv_img_decoder_t *decoder, const void *src,
                     !strcmp((char *)buff, "_SJPG__")) {
 
                 if (!strncmp((char *)buff, "_SJPG__", strlen("_SJPG__"))) {
-                    header->cf = LV_IMG_CF_TRUE_COLOR;
+                    header->cf = LV_IMAGE_CF_TRUE_COLOR;
                 } else {
-                    header->cf = LV_IMG_CF_TRUE_COLOR_ALPHA;
+                    header->cf = LV_IMAGE_CF_TRUE_COLOR_ALPHA;
                 }
 
                 lv_fs_seek(&file, 14, LV_FS_SEEK_SET);
                 res = lv_fs_read(&file, buff, 4, &rn);
                 if (res != LV_FS_RES_OK || rn != 4) {
                     lv_fs_close(&file);
-                    return LV_RES_INV;
+                    return LV_RESULT_INVALID;
                 }
                 uint8_t *data = buff;
                 header->always_zero = 0;
@@ -514,46 +514,46 @@ static lv_res_t decoder_info(struct _lv_img_decoder_t *decoder, const void *src,
                 return lv_ret;
             }
         } else {
-            return LV_RES_INV;
+            return LV_RESULT_INVALID;
         }
     }
 
-    return LV_RES_INV;         /*If didn't succeeded earlier then it's an error*/
+    return LV_RESULT_INVALID;         /*If didn't succeeded earlier then it's an error*/
 }
 
 /**
  * Open a PNG image and return the decided image
  * @param src can be file name or pointer to a C array
  * @param style style of the image object (unused now but certain formats might use it)
- * @return pointer to the decoded image or `LV_IMG_DECODER_OPEN_FAIL` if failed
+ * @return pointer to the decoded image or `LV_IMAGE_DECODER_OPEN_FAIL` if failed
  */
-static lv_res_t decoder_open(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *dsc)
+static lv_result_t decoder_open(lv_image_decoder_t *decoder, lv_image_decoder_dsc_t *dsc)
 {
 
     (void) decoder; /*Unused*/
-    lv_res_t lv_ret = LV_RES_OK;        /*For the return values of PNG decoder functions*/
+    lv_result_t lv_ret = LV_RESULT_OK;        /*For the return values of PNG decoder functions*/
 
     uint8_t *img_data = NULL;
     uint32_t png_width;
     uint32_t png_height;
 
-    if (dsc->src_type == LV_IMG_SRC_VARIABLE) {
+    if (dsc->src_type == LV_IMAGE_SRC_VARIABLE) {
 
-        const lv_img_dsc_t *img_dsc = dsc->src;
+        const lv_image_dsc_t *img_dsc = dsc->src;
 
         uint8_t *data;
         image_decoder_t *img_dec = (image_decoder_t *) dsc->user_data;
         if (img_dec == NULL) {
             img_dec =  malloc(sizeof(image_decoder_t));
             if (!img_dec) {
-                return LV_RES_INV;
+                return LV_RESULT_INVALID;
             }
 
             memset(img_dec, 0, sizeof(image_decoder_t));
 
             dsc->user_data = img_dec;
-            img_dec->dsc_data = (uint8_t *)((lv_img_dsc_t *)(dsc->src))->data;
-            img_dec->dsc_size = ((lv_img_dsc_t *)(dsc->src))->data_size;
+            img_dec->dsc_data = (uint8_t *)((lv_image_dsc_t *)(dsc->src))->data;
+            img_dec->dsc_size = ((lv_image_dsc_t *)(dsc->src))->data_size;
         }
 
         if (!strncmp((char *) img_dec->dsc_data, "_SPNG__", strlen("_SPNG__")) ||
@@ -581,7 +581,7 @@ static lv_res_t decoder_open(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *ds
                 ESP_LOGE(TAG, "Not enough memory for frame_base_array allocation");
                 decoder_cleanup(img_dec);
                 img_dec = NULL;
-                return LV_RES_INV;
+                return LV_RESULT_INVALID;
             }
 
             uint8_t *img_frame_base = data +  img_dec->img_total_frames * 2;
@@ -598,7 +598,7 @@ static lv_res_t decoder_open(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *ds
                 ESP_LOGE(TAG, "Not enough memory for frame_cache allocation");
                 decoder_cleanup(img_dec);
                 img_dec = NULL;
-                return LV_RES_INV;
+                return LV_RESULT_INVALID;
             }
             dsc->img_data = NULL;
 
@@ -614,14 +614,14 @@ static lv_res_t decoder_open(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *ds
             } else if (is_jpg(img_dec->dsc_data, img_dec->dsc_size) == true) {
                 lv_ret = jpeg_decode(&img_data, &png_width, &png_height, img_dsc->data, img_dsc->data_size);
             }
-            if (lv_ret != LV_RES_OK) {
+            if (lv_ret != LV_RESULT_OK) {
                 ESP_LOGE(TAG, "Decode error:%d", lv_ret);
                 if (img_data != NULL) {
                     free(img_data);
                 }
                 decoder_cleanup(img_dec);
                 img_dec = NULL;
-                return LV_RES_INV;
+                return LV_RESULT_INVALID;
             } else {
                 if (is_jpg(img_dec->dsc_data, img_dec->dsc_size) == false) {
                     /*Convert the image to the system's color depth*/
@@ -632,10 +632,10 @@ static lv_res_t decoder_open(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *ds
             }
             return lv_ret;
         } else {
-            return LV_RES_INV;
+            return LV_RESULT_INVALID;
         }
-        return LV_RES_OK;     /*Return with its pointer*/
-    } else if (dsc->src_type == LV_IMG_SRC_FILE) {
+        return LV_RESULT_OK;     /*Return with its pointer*/
+    } else if (dsc->src_type == LV_IMAGE_SRC_FILE) {
         const char *fn = dsc->src;
 
         if (!strcmp(lv_fs_get_ext(fn), "png") ||
@@ -649,7 +649,7 @@ static lv_res_t decoder_open(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *ds
                 img_dec = malloc(sizeof(image_decoder_t));
                 if (!img_dec) {
                     ESP_LOGE(TAG, "Failed to allocate memory for png");
-                    return LV_RES_INV;
+                    return LV_RESULT_INVALID;
                 }
 
                 memset(img_dec, 0, sizeof(image_decoder_t));
@@ -661,7 +661,7 @@ static lv_res_t decoder_open(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *ds
                     free(load_img_data);
                     decoder_cleanup(img_dec);
                 }
-                return LV_RES_INV;
+                return LV_RESULT_INVALID;
             }
 
             if (!strcmp(lv_fs_get_ext(fn), "png")) {
@@ -672,14 +672,14 @@ static lv_res_t decoder_open(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *ds
                 lv_ret = jpeg_decode(&img_data, &png_width, &png_height, load_img_data, load_img_size);
             }
             free(load_img_data);
-            if (lv_ret != LV_RES_OK) {
+            if (lv_ret != LV_RESULT_OK) {
                 ESP_LOGE(TAG, "Decode error:%d", lv_ret);
                 if (img_data != NULL) {
                     free(img_data);
                 }
                 decoder_cleanup(img_dec);
                 img_dec = NULL;
-                return LV_RES_INV;
+                return LV_RESULT_INVALID;
             } else {
                 if (strcmp(lv_fs_get_ext(fn), "jpg")) {
                     /*Convert the image to the system's color depth*/
@@ -706,7 +706,7 @@ static lv_res_t decoder_open(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *ds
             res = lv_fs_read(&lv_file, buff, 22, &rn);
             if (res != LV_FS_RES_OK || rn != 22) {
                 lv_fs_close(&lv_file);
-                return LV_RES_INV;
+                return LV_RESULT_INVALID;
             }
 
             if (!strcmp((char *)buff, "_SPNG__") ||
@@ -719,7 +719,7 @@ static lv_res_t decoder_open(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *ds
                     if (! img_dec) {
                         ESP_LOGE(TAG, "Failed to allocate memory for img_dec");
                         lv_fs_close(&lv_file);
-                        return LV_RES_INV;
+                        return LV_RESULT_INVALID;
                     }
                     memset(img_dec, 0, sizeof(image_decoder_t));
                     dsc->user_data = img_dec;
@@ -746,7 +746,7 @@ static lv_res_t decoder_open(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *ds
                     ESP_LOGE(TAG, "Not enough memory for frame_base_offset allocation");
                     decoder_cleanup(img_dec);
                     img_dec = NULL;
-                    return LV_RES_INV;
+                    return LV_RESULT_INVALID;
                 }
 
                 int img_frame_start_offset = 22 +  img_dec->img_total_frames * 2;
@@ -756,7 +756,7 @@ static lv_res_t decoder_open(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *ds
                     res = lv_fs_read(&lv_file, buff, 2, &rn);
                     if (res != LV_FS_RES_OK || rn != 2) {
                         lv_fs_close(&lv_file);
-                        return LV_RES_INV;
+                        return LV_RESULT_INVALID;
                     }
 
                     data = buff;
@@ -772,7 +772,7 @@ static lv_res_t decoder_open(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *ds
                     lv_fs_close(&lv_file);
                     decoder_cleanup(img_dec);
                     img_dec = NULL;
-                    return LV_RES_INV;
+                    return LV_RESULT_INVALID;
                 }
 
                 uint32_t total_size;
@@ -785,11 +785,11 @@ static lv_res_t decoder_open(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *ds
                 return lv_ret;
             }
         } else {
-            return LV_RES_INV;
+            return LV_RESULT_INVALID;
         }
     }
 
-    return LV_RES_INV;    /*If not returned earlier then it failed*/
+    return LV_RESULT_INVALID;    /*If not returned earlier then it failed*/
 }
 
 /**
@@ -801,15 +801,15 @@ static lv_res_t decoder_open(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *ds
  * @param y start y coordinate
  * @param len number of pixels to decode
  * @param buf a buffer to store the decoded pixels
- * @return LV_RES_OK: ok; LV_RES_INV: failed
+ * @return LV_RESULT_OK: ok; LV_RESULT_INVALID: failed
  */
 
-static lv_res_t decoder_read_line(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *dsc, lv_coord_t x, lv_coord_t y,
+static lv_result_t decoder_read_line(lv_image_decoder_t *decoder, lv_image_decoder_dsc_t *dsc, lv_coord_t x, lv_coord_t y,
                                   lv_coord_t len, uint8_t *buf)
 {
     LV_UNUSED(decoder);
 
-    lv_res_t error = LV_RES_INV;
+    lv_result_t error = LV_RESULT_INVALID;
     uint8_t *img_data = NULL;
 
     uint8_t RGBA_depth = 0;
@@ -833,7 +833,7 @@ static lv_res_t decoder_read_line(lv_img_decoder_t *decoder, lv_img_decoder_dsc_
     RGBA_depth = 2;
 #endif
 
-    if (dsc->src_type == LV_IMG_SRC_FILE) {
+    if (dsc->src_type == LV_IMAGE_SRC_FILE) {
         uint32_t rn = 0;
         lv_fs_res_t res;
 
@@ -841,7 +841,7 @@ static lv_res_t decoder_read_line(lv_img_decoder_t *decoder, lv_img_decoder_dsc_
 
         lv_fs_file_t *lv_file_p = &(img_dec->io.lv_file);
         if (!lv_file_p) {
-            return LV_RES_INV;
+            return LV_RESULT_INVALID;
         }
 
         int png_req_frame_index = y / img_dec->img_single_frame_height;
@@ -861,7 +861,7 @@ static lv_res_t decoder_read_line(lv_img_decoder_t *decoder, lv_img_decoder_dsc_
             res = lv_fs_read(lv_file_p, img_dec->frame_cache, img_block_size, &rn);
             if (res != LV_FS_RES_OK || rn != img_block_size) {
                 lv_fs_close(lv_file_p);
-                return LV_RES_INV;
+                return LV_RESULT_INVALID;
             }
 
             if (is_png(img_dec->frame_cache, rn) == true) {
@@ -871,12 +871,12 @@ static lv_res_t decoder_read_line(lv_img_decoder_t *decoder, lv_img_decoder_dsc_
             } else if (is_jpg(img_dec->frame_cache, rn) == true) {
                 error = jpeg_decode(&img_data, &png_width, &png_height, img_dec->frame_cache, rn);
             }
-            if (error != LV_RES_OK) {
+            if (error != LV_RESULT_OK) {
                 ESP_LOGE(TAG, "Decode error:%d", error);
                 if (img_data != NULL) {
                     free(img_data);
                 }
-                return LV_RES_INV;
+                return LV_RESULT_INVALID;
             } else {
                 if (is_jpg(img_dec->frame_cache, rn) == false) {
                     convert_color_depth(img_data,  png_width * png_height);
@@ -894,8 +894,8 @@ static lv_res_t decoder_read_line(lv_img_decoder_t *decoder, lv_img_decoder_dsc_
 
         uint8_t *cache = (uint8_t *)img_dec->frame_cache + x * img_dec->img_depth + (y % img_dec->img_single_frame_height) * img_dec->img_x_res * img_dec->img_depth;
         memcpy(buf, cache, img_dec->img_depth * len);
-        return LV_RES_OK;
-    } else if (dsc->src_type == LV_IMG_SRC_VARIABLE) {
+        return LV_RESULT_OK;
+    } else if (dsc->src_type == LV_IMAGE_SRC_VARIABLE) {
         image_decoder_t *img_dec = (image_decoder_t *) dsc->user_data;
 
         int spng_req_frame_index = y / img_dec->img_single_frame_height;
@@ -919,12 +919,12 @@ static lv_res_t decoder_read_line(lv_img_decoder_t *decoder, lv_img_decoder_dsc_
             } else if (is_jpg(img_block_data, img_block_size) == true) {
                 error = jpeg_decode(&img_data, &png_width, &png_height, img_block_data, img_block_size);
             }
-            if (error != LV_RES_OK) {
+            if (error != LV_RESULT_OK) {
                 ESP_LOGE(TAG, "Decode error:%d", error);
                 if (img_data != NULL) {
                     free(img_data);
                 }
-                return LV_RES_INV;
+                return LV_RESULT_INVALID;
             } else {
                 if (is_jpg(img_block_data, img_block_size) == false) {
                     convert_color_depth(img_data,  png_width * png_height);
@@ -942,13 +942,13 @@ static lv_res_t decoder_read_line(lv_img_decoder_t *decoder, lv_img_decoder_dsc_
 
         uint8_t *cache = (uint8_t *)img_dec->frame_cache + x * img_dec->img_depth + (y % img_dec->img_single_frame_height) * img_dec->img_x_res * img_dec->img_depth;
         memcpy(buf, cache, img_dec->img_depth * len);
-        return LV_RES_OK;
+        return LV_RESULT_OK;
     }
 
-    return LV_RES_INV;
+    return LV_RESULT_INVALID;
 }
 
-static void decoder_close(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *dsc)
+static void decoder_close(lv_image_decoder_t *decoder, lv_image_decoder_dsc_t *dsc)
 {
     LV_UNUSED(decoder);
     /*Free all allocated data*/
@@ -958,14 +958,14 @@ static void decoder_close(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t *dsc)
     }
 
     switch (dsc->src_type) {
-    case LV_IMG_SRC_FILE:
+    case LV_IMAGE_SRC_FILE:
         if (img_dec->io.lv_file.file_d) {
             lv_fs_close(&(img_dec->io.lv_file));
         }
         decoder_cleanup(img_dec);
         break;
 
-    case LV_IMG_SRC_VARIABLE:
+    case LV_IMAGE_SRC_VARIABLE:
         decoder_cleanup(img_dec);
         break;
 
